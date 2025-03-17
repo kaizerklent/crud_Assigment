@@ -1,74 +1,153 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useReducer, createContext, useContext } from 'react';
+import { View, Text, TextInput, Button, FlatList, StyleSheet } from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+// Define the types
+type Item = {
+  id: string;
+  name: string;
+};
 
-export default function HomeScreen() {
+type Action =
+  | { type: 'ADD'; payload: Item }
+  | { type: 'UPDATE'; payload: Item }
+  | { type: 'DELETE'; payload: string };
+
+type State = Item[];
+
+// Initial state
+const initialState: State = [];
+
+// Reducer function
+const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case 'ADD':
+      return [...state, action.payload];
+    case 'UPDATE':
+      return state.map(item => (item.id === action.payload.id ? action.payload : item));
+    case 'DELETE':
+      return state.filter(item => item.id !== action.payload);
+    default:
+      return state;
+  }
+};
+
+// Create Context
+const ItemsContext = createContext<{
+  state: State;
+  dispatch: React.Dispatch<Action>;
+}>({
+  state: initialState,
+  dispatch: () => null,
+});
+
+// Provider Component
+const ItemsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ItemsContext.Provider value={{ state, dispatch }}>
+      {children}
+    </ItemsContext.Provider>
   );
-}
+};
 
+// Custom hook to use the ItemsContext
+const useItems = () => useContext(ItemsContext);
+
+// Main App Component
+const App: React.FC = () => {
+  const { state, dispatch } = useItems();
+  const [name, setName] = React.useState('');
+  const [editId, setEditId] = React.useState<string | null>(null);
+
+  const handleAdd = () => {
+    if (name.trim()) {
+      const newItem: Item = {
+        id: Math.random().toString(),
+        name: name.trim(),
+      };
+      dispatch({ type: 'ADD', payload: newItem });
+      setName('');
+    }
+  };
+
+  const handleUpdate = () => {
+    if (editId && name.trim()) {
+      const updatedItem: Item = {
+        id: editId,
+        name: name.trim(),
+      };
+      dispatch({ type: 'UPDATE', payload: updatedItem });
+      setName('');
+      setEditId(null);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    dispatch({ type: 'DELETE', payload: id });
+  };
+
+  const handleEdit = (item: Item) => {
+    setName(item.name);
+    setEditId(item.id);
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.Text1}>Crud Assigment</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter item name"
+        value={name}
+        onChangeText={setName}
+      />
+      <Button title={editId ? 'Update' : 'Add'} onPress={editId ? handleUpdate : handleAdd} />
+      <FlatList
+        data={state}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.item}>
+            <Text>{item.name}</Text>
+            <Button title="Edit" onPress={() => handleEdit(item)} />
+            <Button title="Delete" onPress={() => handleDelete(item.id)} />
+          </View>
+        )}
+      />
+    </View>
+  );
+};
+
+// Styles
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 10,
+  },
+  item: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  Text1: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });
+
+// Wrap the App with the ItemsProvider
+export default () => (
+  <ItemsProvider>
+    <App />
+  </ItemsProvider>
+);
